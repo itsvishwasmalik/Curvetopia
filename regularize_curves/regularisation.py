@@ -163,7 +163,41 @@ def plot(paths_XYs, title="", filename="plot.png"):
             ax.plot(XY[:, 0], XY[:, 1], linewidth=2)
     ax.set_aspect('equal')
     plt.title(title)
-    plt.savefig(filename)
+    plt.savefig("assets/" + filename)
     plt.close()
+
+def save_shapes_for_symmetry(i, XYs, filename):
+    # Saving without x and y axes
+    # Calculate the range of the data
+    x_min, x_max = min(XY[:, 0].min() for XY in XYs), max(XY[:, 0].max() for XY in XYs)
+    y_min, y_max = min(XY[:, 1].min() for XY in XYs), max(XY[:, 1].max() for XY in XYs)
+
+    # Calculate the figure size based on the range
+    fig_width = (x_max - x_min) / 10  # Adjust the divisor to control the scaling
+    fig_height = (y_max - y_min) / 10  # Adjust the divisor to control the scaling
+
+    fig, ax = plt.subplots(tight_layout=True, figsize=(fig_width, fig_height))
+    for XY in XYs:
+        ax.plot(XY[:, 0], XY[:, 1], linewidth=2)
+    ax.set_aspect('equal')
+    ax.axis('off')  # Remove x and y axes
+    ax.set_position([0.1, 0.1, 0.8, 0.8])
+    plt.savefig("../symmetry/assets/images/" + filename + "_" + str(i) + ".svg", format='svg', transparent=True)
+    plt.close()
+
+
+def plot_shapes_seperately(paths_XYs, title="", filename="plot.png"):
+    for i, XYs in enumerate(paths_XYs):
+        fig, ax = plt.subplots(tight_layout=True, figsize=(8, 8))
+        for XY in XYs:
+            ax.plot(XY[:, 0], XY[:, 1], linewidth=2)
+        ax.set_aspect('equal')
+        plt.title(title + " " + str(i))
+        plt.savefig("assets/" + filename + "_" + str(i) + ".png")
+        plt.close()
+
+        save_shapes_for_symmetry(i, XYs, filename)
+
 plot(isolated_paths, title="Isolated Curves", filename="isolated_plot.png")
 plot(regularized_paths, title="Regularized Curves", filename="regularized_plot.png")
+plot_shapes_seperately(regularized_paths, title="Regularized Curves", filename="regularized_plot")

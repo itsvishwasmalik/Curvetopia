@@ -1,37 +1,55 @@
+import cv2
+import cairosvg
+import matplotlib.pyplot as plt
 import numpy as np
 
-def read_csv(csv_path):
-    np_path_XYs = np.genfromtxt(csv_path, delimiter=',')
-    path_XYs = []
-    for i in np.unique(np_path_XYs[:, 0]):
-        npXYs = np_path_XYs[np_path_XYs[:, 0] == i][:, 1:]
-        XYs = []
-        for j in np.unique(npXYs[:, 0]):
-            XY = npXYs[npXYs[:, 0] == j][:, 1:]
-            XYs.append(XY)
-        path_XYs.append(XYs)
-    return path_XYs
+def plot_horizontal_symmetry(img, img_no):
+    if img is None :
+        print('Could not open or find the image')
 
-def has_reflection_symmetry(points):
-    center = np.mean(points, axis=0)
-    reflected_points = 2 * center - points
-    return np.allclose(np.sort(points, axis=0), np.sort(reflected_points, axis=0))
+    else:   
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img_symmetry = img.copy()
+        cv2.line(img_symmetry, (0, gray.shape[0]//2), (gray.shape[1], gray.shape[0]//2), (0, 255, 0), 2)
 
-def has_radial_symmetry(points):
-    center = np.mean(points, axis=0)
-    angles = np.arctan2(points[:, 1] - center[1], points[:, 0] - center[0])
-    angles = np.sort(angles)
-    angle_diffs = np.diff(np.concatenate([angles, [angles[0] + 2 * np.pi]]))
-    return np.allclose(angle_diffs, 2 * np.pi / len(points))
+    cv2.imwrite('./assets/horizontal/' + img_no + '.png', img_symmetry)
 
-isolated_csv_path = '../problems/isolated.csv'
-isolated_paths = read_csv(isolated_csv_path)
 
-# Example usage:
-for path in isolated_paths:
-    print("path ======> ", path)
-    for points in path:
-        if has_reflection_symmetry(points):
-            print("Reflection Symmetry Detected")
-        if has_radial_symmetry(points):
-            print("Radial Symmetry Detected")
+def plot_vertical_symmetry(img, img_no):
+    if img is None:
+        print('Could not open or find the image')
+
+    else: 
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        flip_vertically = cv2.flip(gray, 1)
+        img_symmetry = img.copy()
+        cv2.line(img_symmetry, (gray.shape[1]//2, 0), (gray.shape[1]//2, gray.shape[0]), (0, 255, 0), 2) 
+
+    cv2.imwrite('./assets/vertical/' + img_no + '.png', img_symmetry)
+
+
+def plot_diagonal_symmetry(img, img_no):
+    if img is None:
+        print('Could not open or find the image')
+
+    else: 
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        flip_vertically = cv2.flip(gray, 1)
+        img_symmetry = img.copy()
+        cv2.line(img_symmetry, (0, 0), (gray.shape[1], gray.shape[0]), (0, 255, 0), 2) 
+
+    cv2.imwrite('./assets/diagonal/' + img_no + '.png', img_symmetry)
+
+
+def plot_symmetry():
+    for i in range(0,3):
+        i = str(i)
+        file_path = './assets/images/regularized_plot_' + i + '.svg'
+        cairosvg.svg2png(url=file_path, write_to='./temp_image.png')
+        img = cv2.imread('./temp_image.png')
+        # img = cv2.imread('./assets/images/regularized_plot_'+ i +'.svg')
+        plot_horizontal_symmetry(img, i)
+        plot_vertical_symmetry(img, i)
+        plot_diagonal_symmetry(img, i)
+
+plot_symmetry()
