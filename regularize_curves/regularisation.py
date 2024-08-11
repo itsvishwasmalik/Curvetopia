@@ -28,11 +28,90 @@ def regularize_rectangle(XY):
     return np.vstack((rectangle_X, rectangle_Y)).T
 
 
+def regularize_ellipse(XY, num_points=100):
+    mean = np.mean(XY, axis=0)
+    centered_points = XY - mean
+    covariance_matrix = np.cov(centered_points, rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+
+    major_axis = eigenvectors[:, np.argmax(eigenvalues)]
+    minor_axis = eigenvectors[:, np.argmin(eigenvalues)]
+
+    semi_major_axis_length = np.sqrt(np.max(eigenvalues))
+    semi_minor_axis_length = np.sqrt(np.min(eigenvalues))
+
+    theta = np.linspace(0, 2 * np.pi, num_points)
+    ellipse_points = np.zeros((num_points, 2))
+    for i in range(num_points):
+        ellipse_points[i, 0] = semi_major_axis_length * np.cos(theta[i])
+        ellipse_points[i, 1] = semi_minor_axis_length * np.sin(theta[i])
+
+    ellipse_points = np.dot(ellipse_points, [major_axis, minor_axis]) + mean
+
+    return ellipse_points
+
+
+def is_line(points, tol=0.1):
+    if len(points) < 3:
+        return True
+    slopes = np.diff(points, axis=0)
+    slopes_norm = np.linalg.norm(slopes, axis=1, keepdims=True)
+    if np.any(slopes_norm == 0):
+        return False
+    slopes = slopes / slopes_norm
+    return np.allclose(slopes, slopes[0], atol=tol)
+
+
 def is_circle(points, tol=0.2):
     center = np.mean(points, axis=0)
     distances = np.linalg.norm(points - center, axis=1)
     return np.allclose(distances, distances[0], rtol=tol)
 
+
+def is_rectangle(points, tolerance=1e-2):
+    mean = np.mean(points, axis=0)
+    centered_points = points - mean
+    covariance_matrix = np.cov(centered_points, rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+
+    primary_axis = eigenvectors[:, np.argmax(eigenvalues)]
+    secondary_axis = eigenvectors[:, np.argmin(eigenvalues)]
+
+    proj_primary = np.dot(centered_points, primary_axis)
+    proj_secondary = np.dot(centered_points, secondary_axis)
+
+    length = np.max(proj_primary) - np.min(proj_primary)
+    width = np.max(proj_secondary) - np.min(proj_secondary)
+
+    aspect_ratio = length / width if width != 0 else 0
+
+    is_rectangular = (1.0 - tolerance) <= aspect_ratio <= (1.0 + tolerance)
+    
+    uniform_distribution = np.allclose(np.histogram(proj_primary, bins=10)[0],
+                                       np.histogram(proj_secondary, bins=10)[0],
+                                       atol=len(points) * 0.1)
+    return True
+    return is_rectangular and uniform_distribution
+
+def is_ellipse(points, tol=0.1):
+    mean = np.mean(points, axis=0)
+    centered_points = points - mean
+    covariance_matrix = np.cov(centered_points, rowvar=False)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+
+    major_axis = eigenvectors[:, np.argmax(eigenvalues)]
+    minor_axis = eigenvectors[:, np.argmin(eigenvalues)]
+    axis_ratio = np.sqrt(np.max(eigenvalues) / np.min(eigenvalues))
+
+    proj_major = np.dot(centered_points, major_axis)
+    proj_minor = np.dot(centered_points, minor_axis)
+
+    fit_quality_major = np.std(proj_major) / np.mean(np.abs(proj_major))
+    fit_quality_minor = np.std(proj_minor) / np.mean(np.abs(proj_minor))
+
+    return (1 - tol) < axis_ratio < (1 + tol) and \
+           fit_quality_major < tol and \
+           fit_quality_minor < tol
 
 def is_regular_polygon(points, tol=0.2):
     vectors = np.diff(points, axis=0, append=points[:1])
@@ -115,7 +194,15 @@ def identify_and_regularize(XY):
         return regularize_line(XY)
     
     distances = distance.pdist(XY, 'euclidean')
-    if is_star_shape(XY):
+
+    if is_line(XY):
+        return regularize_line(XY)
+    
+    elif is_ellipse(XY):
+        print("Ellipse Detected")
+        return regularize_ellipse(XY)
+    
+    elif is_star_shape(XY):
         print("Star Shape Detected")
         return regularize_star_shape_(XY)
     
@@ -123,8 +210,12 @@ def identify_and_regularize(XY):
         print("Circle Detected")
         return regularize_circle(XY)
     
-    else :
+    elif is_rectangle(XY):
+        print("Rectangle Detected")
         return regularize_rectangle(XY)  # Add more shape identifications as needed
+    
+    else:
+        return XY
 
 def regularise_curves(isolated_paths):
     regularized_paths = []
@@ -201,3 +292,13 @@ def plot_shapes_seperately(paths_XYs, title="", filename="plot.png"):
 plot(isolated_paths, title="Isolated Curves", filename="isolated_plot.png")
 plot(regularized_paths, title="Regularized Curves", filename="regularized_plot.png")
 plot_shapes_seperately(regularized_paths, title="Regularized Curves", filename="regularized_plot")
+
+def convert_paths_to_csv(paths_XYs, filename="regularized.csv"):
+    with open(filename, 'w') as f:
+        for i, XYs in enumerate(paths_XYs):
+            for j, XY in enumerate(XYs):
+                for x, y in XY:
+                    f.write(f"{i},{j},{x},{y}\n")
+    print(f"Saved regularized paths to {filename}")
+
+convert_paths_to_csv(regularized_paths, filename="regularized.csv")
