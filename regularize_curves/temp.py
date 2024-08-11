@@ -27,16 +27,12 @@ def regularize_rectangle(XY):
     rectangle_Y = [min_y, min_y, max_y, max_y, min_y]
     return np.vstack((rectangle_X, rectangle_Y)).T
 
-def regularize_star(XY):
-    # Placeholder for star shape regularization
-    # Implement star shape regularization here
-    return XY
-
 
 def is_circle(points, tol=0.2):
     center = np.mean(points, axis=0)
     distances = np.linalg.norm(points - center, axis=1)
     return np.allclose(distances, distances[0], rtol=tol)
+
 
 def is_regular_polygon(points, tol=0.2):
     vectors = np.diff(points, axis=0, append=points[:1])
@@ -45,6 +41,7 @@ def is_regular_polygon(points, tol=0.2):
     norms = np.linalg.norm(vectors[:-1], axis=1) * np.linalg.norm(vectors[1:], axis=1)
     angles = np.arccos(np.clip(dot_products / norms, -1.0, 1.0))
     return np.allclose(side_lengths, side_lengths[0], rtol=tol) and np.allclose(angles, angles[0], rtol=tol)
+
 
 def is_star_shape(points, tol=0.1):
     center = np.mean(points, axis=0)
@@ -63,46 +60,54 @@ def is_star_shape(points, tol=0.1):
     alternating_pattern = np.allclose(angle_diffs[::2], expected_diffs, atol=tol)
     return alternating_pattern
 
-def regularize_star_shape_(XY):
-    # Calculate the center of the points
-    center = np.mean(XY, axis=0)
-    # Calculate distances from the center and angles
-    distances = np.linalg.norm(XY - center, axis=1)
-    angles = np.arctan2(XY[:, 1] - center[1], XY[:, 0] - center[0])
-    
-    # Sort by angle
-    sorted_indices = np.argsort(angles)
-    sorted_distances = distances[sorted_indices]
-    sorted_angles = angles[sorted_indices]
-    
-    # Identify peaks and valleys based on distance
-    mean_distance = np.mean(sorted_distances)
-    peaks = sorted_distances > mean_distance
-    valleys = sorted_distances <= mean_distance
-    
-    peak_distances = sorted_distances[peaks]
-    valley_distances = sorted_distances[valleys]
-    
-    mean_peak_distance = np.mean(peak_distances)
-    mean_valley_distance = np.mean(valley_distances)
-    
-    regularized_points = []
-    peak_idx = 0
-    valley_idx = 0
-    for i in range(len(sorted_angles)):
-        angle = sorted_angles[i]
-        if peaks[i % len(peaks)]:
-            distance = mean_peak_distance
-            peak_idx += 1
+
+def draw_star_shape(center, inner_radius, outer_radius, rotation_angle):
+    num_points = 5  # Number of star points
+    angle_step = np.pi / num_points  # Angle between star points
+
+    # Generate points for the star
+    points = []
+    for i in range(num_points * 2):
+        angle = i * angle_step + np.radians(rotation_angle)
+        if i % 2 == 0:
+            r = outer_radius
         else:
-            distance = mean_valley_distance
-            valley_idx += 1
-        
-        x = center[0] + distance * np.cos(angle)
-        y = center[1] + distance * np.sin(angle)
-        regularized_points.append([x, y])
-    
-    return np.array(regularized_points)
+            r = inner_radius
+        x = center[0] + r * np.cos(angle)
+        y = center[1] + r * np.sin(angle)
+        points.append((x, y))
+
+    # Add the first point at the end to close the star
+    points.append(points[0])
+    x_points, y_points = zip(*points)
+    return np.array(points)
+
+
+def regularize_star_shape_(XY):
+    # detect the center of the star
+    center = np.mean(XY, axis=0)
+    # print("Center: ", center)
+
+    # detect the outer radius of the star
+    distances = np.linalg.norm(XY - center, axis=1)
+    outer_radius = np.max(distances)
+    # print("Outer Radius: ", outer_radius)
+
+    # detect the inner radius of the star
+    inner_radius = np.min(distances)
+    # print("Inner Radius: ", inner_radius)
+
+    # detect the rotation angle of the star from the x-axis
+    angles = np.arctan2(XY[:, 1] - center[1], XY[:, 0] - center[0])
+    angles = np.sort(angles)
+    angle_diffs = np.diff(np.concatenate([angles, [angles[0] + 2 * np.pi]]))
+    expected_diffs = np.pi / (len(XY) // 2)
+    rotation_angle = np.mean(angles)
+    # print("Rotation Angle: ", rotation_angle)
+
+    # draw the star shape
+    star_points = draw_star_shape(center, inner_radius, outer_radius, np.degrees(rotation_angle))
+    return star_points
 
 
 def identify_and_regularize(XY):
